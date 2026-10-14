@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Laporan Audit Toko</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.bootstrap5.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
+<style>
+  :root { --primary: #2563eb; }
+  body { background:#f1f5f9; font-family: system-ui, -apple-system, sans-serif; }
+  .app-header { background: var(--primary); color:#fff; padding:12px 16px; position:sticky; top:0; z-index:100; }
+  .app-header h5 { margin:0; font-size:1rem; }
+  .card { border:none; box-shadow:0 1px 3px rgba(0,0,0,.08); border-radius:12px; }
+  .form-label { font-size:.85rem; font-weight:600; color:#334155; margin-bottom:4px; }
+  .form-control, .form-select { font-size:.9rem; padding:10px 12px; border-radius:8px; }
+  .btn { border-radius:8px; padding:10px 16px; font-weight:600; }
+  .step-indicator { display:flex; justify-content:space-between; margin-bottom:20px; }
+  .step-dot { flex:1; text-align:center; font-size:.75rem; color:#94a3b8; position:relative; }
+  .step-dot.active { color:var(--primary); font-weight:700; }
+  .step-dot.active::before { background:var(--primary); color:#fff; }
+  .step-dot::before {
+    content: attr(data-step); display:block; width:32px; height:32px;
+    line-height:32px; border-radius:50%; background:#e2e8f0;
+    color:#64748b; margin:0 auto 6px; font-weight:700;
+  }
+  .hidden { display:none !important; }
+  .section-title { font-size:.75rem; text-transform:uppercase; letter-spacing:.5px;
+                   color:#64748b; font-weight:700; margin:16px 0 8px; }
+  @media (max-width: 576px) {
+    .container-fluid { padding:12px; }
+    .btn { width:100%; margin-bottom:6px; }
+  }
+  .toast-container { position:fixed; top:70px; right:16px; z-index:9999; }
+
+  /* Error state untuk field yang belum diisi */
+  .field-error {
+    border-color: #dc3545 !important;
+    background: #fff5f5;
+  }
+  .field-error:focus {
+    border-color: #dc3545 !important;
+    box-shadow: 0 0 0 3px rgba(220, 53, 69, .15) !important;
+  }
+
+  /* Kustom Tom Select */
+  .ts-wrapper.form-select { padding: 0; border: none; background: none; box-shadow: none; }
+  .ts-control {
+    border: 1px solid #dee2e6 !important;
+    border-radius: 8px !important;
+    padding: 10px 12px !important;
+    font-size: .9rem !important;
+    min-height: 44px;
+    background: #fff;
+  }
+  .ts-control.focus {
+    border-color: var(--primary) !important;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, .1) !important;
+  }
+  .ts-wrapper.field-error .ts-control {
+    border-color: #dc3545 !important;
+    background: #fff5f5 !important;
+  }
+  .ts-dropdown {
+    border-radius: 8px !important;
+    border: 1px solid #dee2e6 !important;
+    box-shadow: 0 4px 12px rgba(0,0,0,.08) !important;
+    margin-top: 4px !important;
+  }
+  .ts-dropdown .option { padding: 8px 12px !important; font-size: .9rem; }
+  .ts-dropdown .option.active { background: var(--primary) !important; color: #fff !important; }
+  .ts-dropdown .option:hover { background: #eff6ff !important; }
+</style>
+</head>
+<body>
+
+<!-- ============ HEADER ============ -->
+<div class="app-header d-flex justify-content-between align-items-center">
+  <h5><i class="bi bi-clipboard-data"></i> Laporan Audit Toko</h5>
+  <div id="userInfo" class="hidden">
+    <span id="userName" class="me-2 small"></span>
+    <button class="btn btn-sm btn-light" onclick="logout()"><i class="bi bi-box-arrow-right"></i></button>
+  </div>
+</div>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- ============ HALAMAN LOGIN ============ -->
+<div id="pageLogin" class="container" style="max-width:420px; margin-top:60px;">
+  <div class="card p-4">
+    <h5 class="text-center mb-1">Login</h5>
+    <p class="text-center text-muted small mb-4">Masuk untuk input laporan</p>
+    <form id="formLogin">
+      <div class="mb-3">
+        <label class="form-label">Username</label>
+        <input type="text" class="form-control" id="loginUsername" required>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Password</label>
+        <input type="password" class="form-control" id="loginPassword" required>
+      </div>
+      <button type="submit" class="btn btn-primary w-100">
+        <i class="bi bi-box-arrow-in-right"></i> Masuk
+      </button>
+    </form>
+  </div>
+</div>
+
+<!-- ============ HALAMAN FORM (WIZARD) ============ -->
+<div id="pageForm" class="container-fluid hidden" style="max-width:800px;">
+
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h6 class="mb-0"><i class="bi bi-pencil-square"></i> Input Laporan</h6>
+  </div>
+
+  <div class="step-indicator">
+    <div class="step-dot active" data-step="1" id="dot1">TIM SO</div>
+    <div class="step-dot" data-step="2" id="dot2">Kondisi</div>
+    <div class="step-dot" data-step="3" id="dot3">NKL & SO Kas</div>
+    <div class="step-dot" data-step="4" id="dot4">CCTV & Gembok</div>
+  </div>
+
+  <form id="formLaporan" novalidate>
+    <!-- ============ STEP 1: IDENTITAS ============ -->
+    <div class="card p-3 step-panel" id="step1">
+      <div class="section-title">Toko dan Tim SO</div>
+
+      <div class="mb-3">
+        <label class="form-label">Toko <span class="text-danger">*</span></label>
+        <select class="form-select" id="f_kdtk" placeholder="Ketik KDTK atau nama toko...">
+          <option value="">-- Ketik kode / Pilih Toko --</option>
+        </select>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Tanggal SO <span class="text-danger">*</span></label>
+        <input type="date" class="form-control" id="f_tanggal_so">
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Officer <span class="text-danger">*</span></label>
+        <select class="form-select" id="f_officer">
+          <option value="">-- Pilih Officer --</option>
+        </select>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Koordinator <span class="text-danger">*</span></label>
+        <select class="form-select" id="f_koordinator">
+          <option value="">-- Pilih Koordinator --</option>
+        </select>
+      </div>
+
+      <div class="text-end">
+        <button type="button" class="btn btn-primary" onclick="goStep(2)">
+          Lanjut <i class="bi bi-arrow-right"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- ============ STEP 2: KONDISI FISIK ============ -->
+    <div class="card p-3 step-panel hidden" id="step2">
+      <div class="section-title">Kondisi Fisik</div>
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label">Kondisi Display <span class="text-danger">*</span></label>
+          <select class="form-select" id="f_kondisi_display">
+            <option value="">-- Pilih --</option>
+            <option value="Rapi">Rapi</option>
+            <option value="Tidak Rapi">Tidak Rapi</option>
+          </select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Kondisi Gudang <span class="text-danger">*</span></label>
+          <select class="form-select" id="f_kondisi_gudang">
+            <option value="">-- Pilih --</option>
+            <option value="Rapi">Rapi</option>
+            <option value="Tidak Rapi">Tidak Rapi</option>
+          </select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Kondisi Router <span class="text-danger">*</span></label>
+          <select class="form-select" id="f_kondisi_router">
+            <option value="">-- Pilih --</option>
+            <option value="Koneksi tidak ada kendala">Koneksi tidak ada kendala</option>
+            <option value="Koneksi lemot">Koneksi lemot</option>
+            <option value="Koneksi gudang lemot">Koneksi gudang lemot</option>
+            <option value="komputer lemot">komputer lemot</option>
+            <option value="Koneksi tidak sampai gudang">Koneksi tidak sampai gudang</option>
+            <option value="Router rusak">Router rusak</option>
+            <option value="Kabel Hub rusak">Kabel Hub rusak</option>
+          </select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Posisi Router <span class="text-danger">*</span></label>
+          <select class="form-select" id="f_posisi_router">
+            <option value="">-- Pilih --</option>
+            <option value="Toko">Toko</option>
+            <option value="Gudang">Gudang</option>
+          </select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Posisi Penempatan Router <span class="text-danger">*</span></label>
+          <select class="form-select" id="f_posisi_penempatan_router">
+            <option value="">-- Pilih --</option>
+            <option value="Toko">Toko</option>
+            <option value="Gudang">Gudang</option>
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Jumlah Lantai <span class="text-danger">*</span></label>
+          <select class="form-select" id="f_jumlah_lantai">
+            <option value="">--</option>
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Jumlah Router <span class="text-danger">*</span></label>
+          <select class="form-select" id="f_jumlah_router">
+            <option value="">--</option>
+            <option value="1">1</option>
+            <option value="2">2</option>
+          </select>
+        </div>
+      </div>
+      <div class="d-flex justify-content-between mt-3">
+        <button type="button" class="btn btn-outline-secondary" onclick="goStep(1)">
+          <i class="bi bi-arrow-left"></i> Kembali
+        </button>
+        <button type="button" class="btn btn-primary" onclick="goStep(3)">
+          Lanjut <i class="bi bi-arrow-right"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- ============ STEP 3: NKL & SO KAS ============ -->
+    <div class="card p-3 step-panel hidden" id="step3">
+      <div class="section-title">NKL dan SO KAS</div>
+      <div class="row g-3">
+        <div class="col-6 col-md-4">
+          <label class="form-label">NK (Nota Kurang) <span class="text-danger">*</span></label>
+          <input type="number" class="form-control" id="f_nk" placeholder="">
+        </div>
+        <div class="col-6 col-md-4">
+          <label class="form-label">NL (Nota Lebih) <span class="text-danger">*</span></label>
+          <input type="number" class="form-control" id="f_nl" placeholder="">
+        </div>
+        <div class="col-6 col-md-4">
+          <label class="form-label">NKL (Nota Kurang Lebih) <span class="text-danger">*</span></label>
+          <input type="number" class="form-control" id="f_nkl" placeholder="">
+        </div>
+        <div class="col-12">
+          <label class="form-label">Keterangan NKL <span class="text-danger">*</span></label>
+          <input type="text" class="form-control" id="f_keterangan_nkl" placeholder="Tulis keterangan">
+        </div>
+        <div class="col-6 col-md-4">
+          <label class="form-label">Fisik Uang <span class="text-danger">*</span></label>
+          <input type="number" class="form-control" id="f_fisik_uang" placeholder="">
+        </div>
+        <div class="col-6 col-md-4">
+          <label class="form-label">Modal Induk <span class="text-danger">*</span></label>
+          <input type="number" class="form-control" id="f_modal_induk" placeholder="">
+        </div>
+        <div class="col-6 col-md-4">
+          <label class="form-label">Modal Anak <span class="text-danger">*</span></label>
+          <input type="number" class="form-control" id="f_modal_anak" placeholder="">
+        </div>
+        <div class="col-6 col-md-4">
+          <label class="form-label">Modal PC <span class="text-danger">*</span></label>
+          <input type="number" class="form-control" id="f_modal_pc" placeholder="">
+        </div>
+        <div class="col-6 col-md-4">
+          <label class="form-label">Sales <span class="text-danger">*</span></label>
+          <input type="number" class="form-control" id="f_sales" placeholder="">
+        </div>
+        <div class="col-6 col-md-4">
+          <label class="form-label">Kas Toko <span class="text-danger">*</span></label>
+          <input type="number" class="form-control" id="f_kas_toko" placeholder="">
+        </div>
+        <div class="col-6 col-md-4">
+          <label class="form-label">Personil <span class="text-danger">*</span></label>
+          <input type="number" class="form-control" id="f_personil" placeholder="">
+        </div>
+        <div class="col-6 col-md-4">
+          <label class="form-label">Bon <span class="text-danger">*</span></label>
+          <input type="number" class="form-control" id="f_bon" placeholder="">
+        </div>
+        <div class="col-6 col-md-4">
+          <label class="form-label">Variance <span class="text-danger">*</span></label>
+          <input type="number" class="form-control" id="f_variance" placeholder="">
+        </div>
+        <div class="col-6 col-md-4">
+          <label class="form-label">Tukar DC <span class="text-danger">*</span></label>
+          <input type="number" class="form-control" id="f_tukar_dc" placeholder="">
+        </div>
+        <div class="col-6 col-md-4">
+          <label class="form-label">Lain-lain <span class="text-danger">*</span></label>
+          <input type="number" class="form-control" id="f_lain_lain" placeholder="">
+        </div>
+      </div>
+      <div class="d-flex justify-content-between mt-3">
+        <button type="button" class="btn btn-outline-secondary" onclick="goStep(2)">
+          <i class="bi bi-arrow-left"></i> Kembali
+        </button>
+        <button type="button" class="btn btn-primary" onclick="goStep(4)">
+          Lanjut <i class="bi bi-arrow-right"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- ============ STEP 4: CCTV & GEMBOK ============ -->
+    <div class="card p-3 step-panel hidden" id="step4">
+      <div class="section-title">CCTV dan Gembok</div>
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label">CCTV Jelas <span class="text-danger">*</span></label>
+          <select class="form-select" id="f_cctv_jelas">
+            <option value="">-- Pilih --</option>
+            <option value="Jelas">Jelas</option>
+            <option value="Tidak Jelas">Tidak Jelas</option>
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">CCTV Tertutup <span class="text-danger">*</span></label>
+          <select class="form-select" id="f_cctv_tertutup">
+            <option value="">-- Pilih --</option>
+            <option value="Jelas">Jelas</option>
+            <option value="Tidak Jelas">Tidak Jelas</option>
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">CCTV Sesuai <span class="text-danger">*</span></label>
+          <select class="form-select" id="f_cctv_sesuai">
+            <option value="">-- Pilih --</option>
+            <option value="Jelas">Jelas</option>
+            <option value="Tidak Jelas">Tidak Jelas</option>
+          </select>
+        </div>
+        <div class="col-12">
+          <label class="form-label">Keterangan CCTV <span class="text-danger">*</span></label>
+          <input type="text" class="form-control" id="f_ket_cctv" placeholder="Tulis keterangan">
+        </div>
+      </div>
+
+      <div class="section-title">Keamanan</div>
+      <div class="row g-3">
+        <div class="col-6 col-md-4">
+          <label class="form-label">Kunci Diacak <span class="text-danger">*</span></label>
+          <select class="form-select" id="f_kunci_diacak">
+            <option value="">-- Pilih --</option>
+            <option value="Ya">Ya</option>
+            <option value="Tidak">Tidak</option>
+          </select>
+        </div>
+        <div class="col-6 col-md-4">
+          <label class="form-label">Toko 24 Jam <span class="text-danger">*</span></label>
+          <select class="form-select" id="f_toko_24jam">
+            <option value="">-- Pilih --</option>
+            <option value="Ya">Ya</option>
+            <option value="Tidak">Tidak</option>
+          </select>
+        </div>
+        <div class="col-6 col-md-4">
+          <label class="form-label">Sudah Terbiasa <span class="text-danger">*</span></label>
+          <select class="form-select" id="f_sudah_terbiasa">
+            <option value="">-- Pilih --</option>
+            <option value="Ya">Ya</option>
+            <option value="Tidak">Tidak</option>
+          </select>
+        </div>
+        <div class="col-6 col-md-4">
+          <label class="form-label">Catatan Hilang <span class="text-danger">*</span></label>
+          <select class="form-select" id="f_catatan_hilang">
+            <option value="">-- Pilih --</option>
+            <option value="Ya">Ya</option>
+            <option value="Tidak">Tidak</option>
+          </select>
+        </div>
+        <div class="col-6 col-md-4">
+          <label class="form-label">Kunci Rusak <span class="text-danger">*</span></label>
+          <select class="form-select" id="f_kunci_rusak">
+            <option value="">-- Pilih --</option>
+            <option value="Ya">Ya</option>
+            <option value="Tidak">Tidak</option>
+          </select>
+        </div>
+        <div class="col-12">
+          <label class="form-label">Keterangan Kunci <span class="text-danger">*</span></label>
+          <input type="text" class="form-control" id="f_ket_kunci" placeholder="Tulis keterangan">
+        </div>
+      </div>
+
+      <div class="d-flex justify-content-between mt-3">
+        <button type="button" class="btn btn-outline-secondary" onclick="goStep(3)">
+          <i class="bi bi-arrow-left"></i> Kembali
+        </button>
+        <button type="submit" class="btn btn-success">
+          <i class="bi bi-check-circle"></i> Simpan Laporan
+        </button>
+      </div>
+    </div>
+  </form>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+// ============================================================
+// KONFIGURASI
+// ============================================================
+const API_URL = 'https://script.google.com/macros/s/AKfycbzFlIlWozL91UkiGLuf7agICAbdF6--PLnkz3Qnnq0yNwMymfpg8vFtNuO4ZkjUItDA/exec';
+
+// ============================================================
+// STATE
+// ============================================================
+let currentUser = null;
+let masterToko = [];
+let masterOfficer = [];
+let masterKoordinator = [];
+let tomSelectToko = null;
+
+// ============================================================
+// DAFTAR FIELD WAJIB PER STEP
+// ============================================================
+const REQUIRED_FIELDS = {
+  1: ['f_kdtk', 'f_tanggal_so', 'f_officer', 'f_koordinator'],
+  2: ['f_kondisi_display', 'f_kondisi_gudang', 'f_kondisi_router',
+      'f_posisi_router', 'f_posisi_penempatan_router',
+      'f_jumlah_lantai', 'f_jumlah_router'],
+  3: ['f_nk', 'f_nl', 'f_nkl', 'f_keterangan_nkl', 'f_fisik_uang',
+      'f_modal_induk', 'f_modal_anak', 'f_modal_pc', 'f_sales',
+      'f_kas_toko', 'f_personil', 'f_bon', 'f_variance',
+      'f_tukar_dc', 'f_lain_lain'],
+  4: ['f_cctv_jelas', 'f_cctv_tertutup', 'f_cctv_sesuai', 'f_ket_cctv',
+      'f_kunci_diacak', 'f_toko_24jam', 'f_sudah_terbiasa',
+      'f_catatan_hilang', 'f_kunci_rusak', 'f_ket_kunci']
+};
+
+// ============================================================
+// UTIL
+// ============================================================
+async function api(action, payload = {}) {
+  const res = await fetch(API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({ action, ...payload, user_input: currentUser?.nama })
+  });
+  return res.json();
+}
+
+function toast(msg, type = 'success') {
+  const el = document.createElement('div');
+  el.className = `alert alert-${type} shadow-sm`;
+  el.style.minWidth = '250px';
+  el.innerHTML = msg;
+  document.getElementById('toastContainer').appendChild(el);
+  setTimeout(() => el.remove(), 3000);
+}
+
+function show(id) { document.getElementById(id).classList.remove('hidden'); }
+function hide(id) { document.getElementById(id).classList.add('hidden'); }
+
+// ============================================================
+// VALIDASI
+// ============================================================
+function isFieldEmpty(el) {
+  if (!el) return true;
+  const val = (el.value || '').trim();
+  if (val === '') return true;
+  // Field number: 0 DIIZINKAN (bukan dianggap kosong)
+  // hanya kosong string "" yang dianggap belum diisi
+  return false;
+}
+
+function validateStep(step) {
+  const fields = REQUIRED_FIELDS[step] || [];
+  let firstError = null;
+
+  fields.forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+
+    if (isFieldEmpty(el)) {
+      // Tandai error
+      el.classList.add('field-error');
+      // Tom Select — tandai wrapper
+      const wrapper = el.closest('.ts-wrapper');
+      if (wrapper) wrapper.classList.add('field-error');
+
+      if (!firstError) firstError = el;
+    } else {
+      // Hapus tanda error
+      el.classList.remove('field-error');
+      const wrapper = el.closest('.ts-wrapper');
+      if (wrapper) wrapper.classList.remove('field-error');
+    }
+  });
+
+  if (firstError) {
+    toast('⚠️ Lengkapi semua field yang bertanda *', 'warning');
+    firstError.focus();
+    // Scroll ke field error
+    firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return false;
+  }
+  return true;
+}
+
+// Hapus tanda error saat user mulai isi
+document.addEventListener('input', (e) => {
+  if (e.target.matches('input, select, textarea')) {
+    if (!isFieldEmpty(e.target)) {
+      e.target.classList.remove('field-error');
+      const wrapper = e.target.closest('.ts-wrapper');
+      if (wrapper) wrapper.classList.remove('field-error');
+    }
+  }
+});
+document.addEventListener('change', (e) => {
+  if (e.target.matches('input, select, textarea')) {
+    if (!isFieldEmpty(e.target)) {
+      e.target.classList.remove('field-error');
+      const wrapper = e.target.closest('.ts-wrapper');
+      if (wrapper) wrapper.classList.remove('field-error');
+    }
+  }
+});
+
+// ============================================================
+// LOGIN
+// ============================================================
+document.getElementById('formLogin').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const username = document.getElementById('loginUsername').value.trim();
+  const password = document.getElementById('loginPassword').value;
+  try {
+    const res = await api('login', { username, password });
+    if (res.success) {
+      currentUser = res.user;
+      localStorage.setItem('user', JSON.stringify(currentUser));
+      initApp();
+    } else {
+      toast(res.message, 'danger');
+    }
+  } catch(err) {
+    toast('Gagal koneksi: ' + err.message, 'danger');
+  }
+});
+
+function logout() {
+  localStorage.removeItem('user');
+  location.reload();
+}
+
+// ============================================================
+// INIT
+// ============================================================
+async function initApp() {
+  hide('pageLogin');
+  show('pageForm');
+  document.getElementById('userInfo').classList.remove('hidden');
+  document.getElementById('userName').textContent = currentUser.nama + ' (' + currentUser.role + ')';
+
+  const [toko, officer, koordinator] = await Promise.all([
+    api('getMasterToko'),
+    api('getMasterOfficer', { jabatan: 'officer' }),
+    api('getMasterOfficer', { jabatan: 'koordinator' })
+  ]);
+
+  masterToko = toko.data || [];
+  masterOfficer = officer.data || [];
+  masterKoordinator = koordinator.data || [];
+
+  // Isi dropdown toko
+  document.getElementById('f_kdtk').innerHTML =
+    '<option value="">-- Ketik kode / Pilih Toko --</option>' +
+    masterToko.map(t => `<option value="${t.kdtk}">${t.kdtk} - ${t.nama_toko}</option>`).join('');
+
+  // Tom Select
+  if (tomSelectToko) tomSelectToko.destroy();
+  tomSelectToko = new TomSelect('#f_kdtk', {
+    placeholder: 'Ketik KDTK atau nama toko...',
+    allowEmptyOption: true,
+    maxOptions: 50,
+    sortField: [{ field: 'text', direction: 'asc' }],
+    searchField: ['text', 'value']
+  });
+
+  // Officer & Koordinator
+  document.getElementById('f_officer').innerHTML =
+    '<option value="">-- Pilih Officer --</option>' +
+    masterOfficer.map(o => `<option value="${o.nama}">${o.nama}</option>`).join('');
+
+  document.getElementById('f_koordinator').innerHTML =
+    '<option value="">-- Pilih Koordinator --</option>' +
+    masterKoordinator.map(o => `<option value="${o.nama}">${o.nama}</option>`).join('');
+
+  document.getElementById('f_tanggal_so').valueAsDate = new Date();
+
+  goStep(1);
+}
+
+// ============================================================
+// WIZARD STEP
+// ============================================================
+function goStep(n) {
+  // Validasi step sebelumnya (kecuali dari step 1 ke 1 = init)
+  if (n > 1) {
+    if (!validateStep(n - 1)) return;   // ← STOP kalau ada yang kosong
+  }
+  for (let i = 1; i <= 4; i++) {
+    document.getElementById('step' + i).classList.toggle('hidden', i !== n);
+    document.getElementById('dot' + i).classList.toggle('active', i <= n);
+  }
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ============================================================
+// FORM SUBMIT
+// ============================================================
+document.getElementById('formLaporan').addEventListener('submit', async (e) => {
+  e.preventDefault();
+
+  // Validasi SEMUA step sebelum submit
+  for (let s = 1; s <= 4; s++) {
+    if (!validateStep(s)) {
+      // Buka step yang error
+      for (let i = 1; i <= 4; i++) {
+        document.getElementById('step' + i).classList.toggle('hidden', i !== s);
+        document.getElementById('dot' + i).classList.toggle('active', i <= s);
+      }
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+  }
+
+  const kdtk = document.getElementById('f_kdtk').value;
+  const toko = masterToko.find(t => t.kdtk === kdtk);
+
+  const laporan = {
+    kdtk: kdtk,
+    nama_toko: toko ? toko.nama_toko : '',
+    tanggal_so: document.getElementById('f_tanggal_so').value,
+    officer: document.getElementById('f_officer').value,
+    koordinator: document.getElementById('f_koordinator').value,
+    kondisi_display: document.getElementById('f_kondisi_display').value,
+    kondisi_gudang: document.getElementById('f_kondisi_gudang').value,
+    kondisi_router: document.getElementById('f_kondisi_router').value,
+    posisi_router: document.getElementById('f_posisi_router').value,
+    posisi_penempatan_router: document.getElementById('f_posisi_penempatan_router').value,
+    nk: +document.getElementById('f_nk').value || 0,
+    nl: +document.getElementById('f_nl').value || 0,
+    nkl: +document.getElementById('f_nkl').value || 0,
+    keterangan_nkl: document.getElementById('f_keterangan_nkl').value,
+    fisik_uang: +document.getElementById('f_fisik_uang').value || 0,
+    modal_induk: +document.getElementById('f_modal_induk').value || 0,
+    modal_anak: +document.getElementById('f_modal_anak').value || 0,
+    modal_pc: +document.getElementById('f_modal_pc').value || 0,
+    sales: +document.getElementById('f_sales').value || 0,
+    kas_toko: +document.getElementById('f_kas_toko').value || 0,
+    personil: +document.getElementById('f_personil').value || 0,
+    bon: +document.getElementById('f_bon').value || 0,
+    variance: +document.getElementById('f_variance').value || 0,
+    tukar_dc: +document.getElementById('f_tukar_dc').value || 0,
+    lain_lain: +document.getElementById('f_lain_lain').value || 0,
+    jumlah_lantai: document.getElementById('f_jumlah_lantai').value,
+    jumlah_router: document.getElementById('f_jumlah_router').value,
+    cctv_jelas: document.getElementById('f_cctv_jelas').value,
+    cctv_tertutup: document.getElementById('f_cctv_tertutup').value,
+    cctv_sesuai: document.getElementById('f_cctv_sesuai').value,
+    ket_cctv: document.getElementById('f_ket_cctv').value,
+    kunci_diacak: document.getElementById('f_kunci_diacak').value,
+    toko_24jam: document.getElementById('f_toko_24jam').value,
+    sudah_terbiasa: document.getElementById('f_sudah_terbiasa').value,
+    catatan_hilang: document.getElementById('f_catatan_hilang').value,
+    kunci_rusak: document.getElementById('f_kunci_rusak').value,
+    ket_kunci: document.getElementById('f_ket_kunci').value
+  };
+
+  const btn = e.submitter;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Menyimpan...';
+
+  try {
+    const res = await api('simpanLaporan', { laporan, user_input: currentUser.nama });
+    if (res.success) {
+      toast('✅ Laporan berhasil disimpan (ID: ' + res.id + ')');
+      document.getElementById('formLaporan').reset();
+      document.getElementById('f_tanggal_so').valueAsDate = new Date();
+      if (tomSelectToko) tomSelectToko.clear();
+      // Hapus semua tanda error
+      document.querySelectorAll('.field-error').forEach(el => el.classList.remove('field-error'));
+      goStep(1);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } else {
+      toast(res.message, 'danger');
+    }
+  } catch(err) {
+    toast('Gagal: ' + err.message, 'danger');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-check-circle"></i> Simpan Laporan';
+  }
+});
+
+// ============================================================
+// AUTO LOGIN
+// ============================================================
+(function autoLogin() {
+  const saved = localStorage.getItem('user');
+  if (saved) {
+    try {
+      currentUser = JSON.parse(saved);
+      initApp();
+    } catch(e) { localStorage.removeItem('user'); }
+  }
+})();
+</script>
+</body>
+</html>
